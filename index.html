@@ -86,12 +86,34 @@ table.detail{font-size:13px}table.detail td{padding:6px 5px}
 td.nw{white-space:nowrap}td.tx{text-align:right;min-width:170px;max-width:300px;white-space:pre-wrap;word-break:break-word}
 details.card summary{list-style:none}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+#login{display:none;position:fixed;inset:0;z-index:50;background:var(--bg);align-items:center;justify-content:center;padding:16px}
+body.locked #login{display:flex}
+body.locked>header,body.locked>main,body.locked>nav{display:none}
+#login form{width:min(380px,100%);margin:0}
+.lgerr{color:var(--open);font-size:13px;min-height:20px;margin-top:8px}
+.syncst{font-size:12px;opacity:.9;white-space:nowrap}
+.rb-wrap{display:inline-flex;gap:4px;white-space:nowrap}
+.rb{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:7px;padding:1px 7px;font:inherit;font-size:13px;line-height:1.6;cursor:pointer}
+.rb.dn{color:var(--done);border-color:var(--done)}.rb.pz{color:var(--pause);border-color:var(--pause)}
+td.racts{white-space:nowrap}
+header h1{min-width:0}
 </style>
 </head>
-<body>
+<body class="locked">
+<div id="login">
+  <form class="card" id="lgForm">
+    <h2>ورود به پیگیری کار روزانه</h2>
+    <div class="field"><label for="lgUser">نام کاربری یا ایمیل</label><input id="lgUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" dir="ltr"></div>
+    <div class="field" style="margin-top:8px"><label for="lgPass">رمز عبور</label><input id="lgPass" name="password" type="password" autocomplete="current-password" dir="ltr"></div>
+    <div id="lgErr" class="lgerr" role="alert"></div>
+    <button class="btn big" id="lgBtn" type="submit">ورود</button>
+  </form>
+</div>
 <header>
   <h1>پیگیری کار روزانه</h1>
+  <span id="syncSt" class="syncst"></span>
   <button id="installBtn" hidden>نصب اپ</button>
+  <button id="logoutBtn" type="button">خروج</button>
 </header>
 
 <main>
@@ -125,6 +147,7 @@ details.card summary{list-style:none}
         <div><label for="fuSearch">جستجو</label><input id="fuSearch" placeholder="کد پروژه، شرح، پاسخ..."></div>
         <div><label for="fuWork">کار</label><select id="fuWork"></select></div>
         <div><label for="fuState">نمایش</label><select id="fuState"><option value="">همه (باز + PAUSE)</option><option value="open">فقط باز</option><option value="pause">فقط PAUSE</option></select></div>
+        <div><label for="fuSort">مرتب‌سازی بر اساس تاریخ</label><select id="fuSort"><option value="asc">قدیمی‌ترین اول</option><option value="desc">جدیدترین اول</option></select></div>
       </div>
       <div class="hint">کارهای باز و کارهای PAUSE اینجا می‌مانند تا تمام شوند. با DONE تمام می‌شوند و با Continue از نو شروع می‌شوند.</div>
     </div>
@@ -133,12 +156,25 @@ details.card summary{list-style:none}
 
   <!-- گزارش -->
   <section class="view" id="v-report">
-    <div class="card"><div class="row">
-      <div><label for="rProject">کد پروژه (خالی = همه پروژه‌ها)</label>
-      <input id="rProject" list="projList" inputmode="numeric" autocomplete="off" placeholder="مثلاً 600687"></div>
-      <div><label for="rSearch">جستجو در گزارش</label>
-      <input id="rSearch" autocomplete="off" placeholder="شرح، پاسخ، کار، وضعیت..."></div>
-    </div></div>
+    <div class="card">
+      <div class="row">
+        <div><label for="rProject">کد پروژه (خالی = همه پروژه‌ها)</label>
+        <input id="rProject" list="projList" inputmode="numeric" autocomplete="off" placeholder="مثلاً 600687"></div>
+        <div><label for="rSearch">جستجو در گزارش</label>
+        <input id="rSearch" autocomplete="off" placeholder="شرح، پاسخ، کار، وضعیت..."></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label for="rFrom">از تاریخ (میلادی)</label><input id="rFrom" type="date"></div>
+        <div><label for="rTo">تا تاریخ (میلادی)</label><input id="rTo" type="date"></div>
+        <div><label for="rWork">کار</label><select id="rWork"></select></div>
+        <div><label for="rStatus">وضعیت</label><select id="rStatus"><option value="">همه</option><option value="open">باز</option><option value="DONE">DONE</option><option value="PAUSE">PAUSE</option></select></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="rExport" type="button">⬇ خروجی Excel گزارش (با همین فیلترها)</button>
+        <button class="btn sec" id="rClear" type="button">پاک کردن فیلترها</button>
+      </div>
+      <div class="hint">فیلتر تاریخ بر اساس «زمان شروع» هر کار است. فایل Excel شامل سه شیت است: «ثبت روزانه»، «کدهای کار» و «خلاصه» (جمع هر کار در هر پروژه).</div>
+    </div>
     <details class="card" id="projDetails" open><summary style="cursor:pointer;font-weight:bold">خلاصه همه پروژه‌ها</summary><div id="allProjects" style="margin-top:8px"></div></details>
     <div id="reportBody"></div>
   </section>
@@ -156,13 +192,18 @@ details.card summary{list-style:none}
       <label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" id="jalali" style="width:auto"> نمایش تاریخ‌ها به شمسی (ذخیره‌سازی میلادی می‌ماند)</label>
     </div>
     <div class="card">
+      <h2>حساب و همگام‌سازی</h2>
+      <div class="row"><button class="btn" id="syncBtn" type="button">همگام‌سازی همین الان</button></div>
+      <div class="hint">داده‌ها در حساب شما ذخیره می‌شوند و بین همه‌ی دستگاه‌هایی که با همین حساب وارد شده‌اند خودکار همگام می‌شوند. اگر اینترنت نباشد، کار روی همین دستگاه ادامه دارد و بعداً خودکار ارسال می‌شود. دکمه‌ی «خروج» بالای صفحه، داده‌های این دستگاه را پاک می‌کند (داده‌ی سرور می‌ماند).</div>
+    </div>
+    <div class="card">
       <h2>پشتیبان‌گیری (Excel)</h2>
       <div class="row">
         <button class="btn" id="expXlsx">خروجی Excel (پشتیبان)</button>
         <button class="btn sec" id="impXlsx">ورود از Excel</button>
       </div>
       <input type="file" id="fileIn" accept=".xlsx,.xlsm,.csv,.json" hidden>
-      <div class="hint">فایل خروجی یک Excel ساده با دو شیت است: «ثبت روزانه» (ردیف، کد پروژه، کار، زمان شروع، وضعیت، زمان پایان، شرح، پاسخ) و «کدهای کار». می‌توانید آن را در Excel باز کنید و ببینید. «ورود از Excel» همه داده‌های فعلی را با محتوای فایل جایگزین می‌کند، پس قبلش خروجی بگیرید. داده‌ها فقط روی همین دستگاه ذخیره می‌شوند.</div>
+      <div class="hint">فایل خروجی یک Excel ساده با دو شیت است: «ثبت روزانه» (ردیف، کد پروژه، کار، زمان شروع، وضعیت، زمان پایان، شرح، پاسخ) و «کدهای کار». می‌توانید آن را در Excel باز کنید و ببینید. «ورود از Excel» همه داده‌های فعلی را با محتوای فایل جایگزین می‌کند، پس قبلش خروجی بگیرید. نام فایل پشتیبان به شکل task-tracker_تاریخ_ساعت.xlsx است تا آخرین نسخه را راحت پیدا کنید.</div>
       <div id="storageInfo" class="hint"></div>
     </div>
     <div class="card">
@@ -209,6 +250,12 @@ details.card summary{list-style:none}
   <div class="row"><button class="btn danger" id="cOk" type="button">تأیید</button><button class="btn sec" id="cNo" type="button">انصراف</button></div>
 </dialog>
 
+<dialog id="rpdlg">
+  <p id="rpMsg" style="margin:0 0 10px"></p>
+  <textarea id="rpText" rows="3" placeholder="متن پاسخ..."></textarea>
+  <div class="row" style="margin-top:10px"><button class="btn" id="rpOk" type="button">ثبت پاسخ</button><button class="btn sec" id="rpNo" type="button">انصراف</button></div>
+</dialog>
+
 <div id="toast"></div>
 
 <script>
@@ -237,9 +284,16 @@ const DEFAULT_CODES = [
   { code: "DOC", desc: "DOCUMENT", type: "hours" },
 ];
 let S = { entries: [], codes: DEFAULT_CODES.map(c => ({ ...c })), nextId: 1, jalali: false };
-let saveTimer = null;
-function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => dbSet("state", S).catch(() => toast("ذخیره‌سازی انجام نشد!")), 150); }
-async function saveNow() { clearTimeout(saveTimer); await dbSet("state", S); }
+let saveTimer = null, localVer = 0;
+let META = { dirty: false, rev: null, synced: false };
+function save() {
+  clearTimeout(saveTimer); META.dirty = true; localVer++;
+  saveTimer = setTimeout(async () => {
+    try { await dbSet("state", S); await dbSet("meta", META); } catch (e) { toast("ذخیره‌سازی انجام نشد!"); }
+    schedulePush();
+  }, 150);
+}
+async function saveNow() { clearTimeout(saveTimer); await dbSet("state", S); await dbSet("meta", META); }
 
 /* ---------- ابزارها ---------- */
 const $ = s => document.querySelector(s);
@@ -321,7 +375,7 @@ function renderDaily() {
 }
 function renderFollow() {
   const q = $("#fuSearch").value.trim(), w = $("#fuWork").value, st = $("#fuState").value;
-  const list = S.entries.filter(e => inFollow(e) && (!st || (st === "open" ? isOpen(e) : e.status === "PAUSE")) && matches(e, q) && (!w || e.work === w)).sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  const list = S.entries.filter(e => inFollow(e) && (!st || (st === "open" ? isOpen(e) : e.status === "PAUSE")) && matches(e, q) && (!w || e.work === w)).sort((a, b) => ($("#fuSort").value === "desc" ? -1 : 1) * ((a.start || "").localeCompare(b.start || "") || a.id - b.id));
   const drafts = {}; document.querySelectorAll("#followList [data-reply]").forEach(t => { if (t.value) drafts[t.dataset.reply] = t.value; });
   const act = document.activeElement, actId = act && act.dataset ? act.dataset.reply : null;
   $("#followList").innerHTML = list.length ? list.map(e => entryHTML(e, true, true)).join("") : `<div class="empty">کار بازی وجود ندارد 🎉</div>`;
@@ -330,8 +384,7 @@ function renderFollow() {
   const n = S.entries.filter(inFollow).length;
   $("#openBadge").hidden = !n; $("#openBadge").textContent = n;
 }
-function reportData(proj) {
-  const rows = S.entries.filter(e => e.project === proj);
+function reportData(rows) {
   const works = [...new Set(rows.map(e => e.work))];
   const order = S.codes.map(c => c.code);
   works.sort((a, b) => (order.indexOf(a) < 0 ? 99 : order.indexOf(a)) - (order.indexOf(b) < 0 ? 99 : order.indexOf(b)));
@@ -342,6 +395,19 @@ function reportData(proj) {
   });
   return { rows, table, hours: table.filter(t => t.type !== "count").reduce((s, t) => s + t.total, 0), open: rows.filter(isOpen).length };
 }
+function reportBase() {
+  const q = $("#rSearch").value.trim().toLowerCase(), from = $("#rFrom").value, to = $("#rTo").value, w = $("#rWork").value, st = $("#rStatus").value;
+  return S.entries.filter(e => {
+    if (w && e.work !== w) return false;
+    if (st === "open" ? !isOpen(e) : st && (isOpen(e) || e.status !== st)) return false;
+    const d = (e.start || "").slice(0, 10);
+    if ((from || to) && !d) return false;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return !q || `${e.id} ${e.project} ${e.work} ${STAT(e)} ${e.desc} ${e.reply}`.toLowerCase().includes(q);
+  });
+}
+const reportRows = () => { const p = $("#rProject").value.trim(); return reportBase().filter(e => !p || e.project === p); };
 const SORT = { works: { k: "work", d: 1 }, projs: { k: "p", d: 1 }, detail: { k: "start", d: -1 } };
 let reportShown = 200;
 const STAT = e => isOpen(e) ? "باز" : (e.status || "—");
@@ -356,12 +422,24 @@ function sortRows(rows, tbl, getters) {
     return c * s.d;
   });
 }
+function rActs(e) {
+  const o = isOpen(e), p = e.status === "PAUSE" && !resumed(e);
+  if (!o && !p) return "";
+  return `<span class="rb-wrap"><button type="button" class="rb" data-ract="reply" data-id="${e.id}" title="افزودن پاسخ" aria-label="افزودن پاسخ">💬</button>${o ? `<button type="button" class="rb pz" data-ract="pause" data-id="${e.id}" title="PAUSE" aria-label="PAUSE">⏸</button>` : ""}<button type="button" class="rb dn" data-ract="done" data-id="${e.id}" title="پایان (DONE)" aria-label="DONE">✓</button></span>`;
+}
+let replyFor = null;
+function reportAct(act, id) {
+  const e = S.entries.find(x => x.id === id); if (!e) return;
+  if (act === "reply") { replyFor = id; $("#rpMsg").textContent = `پاسخ برای ردیف #${id} — پروژه ${e.project} (${e.work})`; $("#rpText").value = ""; $("#rpdlg").showModal(); $("#rpText").focus(); }
+  else if (act === "pause") closeEntry(id, "PAUSE");
+  else if (act === "done") { if (isOpen(e)) closeEntry(id, "DONE"); else { e.status = "DONE"; save(); renderAll(); toast("DONE ثبت شد ✓"); } }
+}
 function renderReport() {
-  const proj = $("#rProject").value.trim(), q = $("#rSearch").value.trim().toLowerCase();
+  const proj = $("#rProject").value.trim(), base = reportBase(), rows = base.filter(e => !proj || e.project === proj);
   let html = "";
   if (proj) {
-    const d = reportData(proj);
-    if (!d.rows.length) html += `<div class="card empty">برای پروژه ${esc(proj)} داده‌ای ثبت نشده است.</div>`;
+    const d = reportData(rows);
+    if (!d.rows.length) html += `<div class="card empty">برای پروژه ${esc(proj)} با این فیلترها داده‌ای نیست.</div>`;
     else {
       const WG = { work: t => t.work, total: t => t.total, unit: t => t.type, open: t => t.open };
       html += `<div class="stats"><div class="stat"><b>${d.hours.toFixed(1)}</b><span>جمع ساعت کار</span></div>
@@ -371,14 +449,13 @@ function renderReport() {
       ${sortRows(d.table, "works", WG).map(t => `<tr><td>${esc(t.work)}</td><td>${t.type === "count" ? t.total : t.total.toFixed(2)}</td><td>${t.type === "count" ? "عدد" : "ساعت"}</td><td>${t.open || ""}</td></tr>`).join("")}</table></div></div>`;
     }
   }
-  const rows = S.entries.filter(e => (!proj || e.project === proj) && (!q || `${e.id} ${e.project} ${e.work} ${STAT(e)} ${e.desc} ${e.reply}`.toLowerCase().includes(q)));
   const sorted = sortRows(rows, "detail", DG), part = sorted.slice(0, reportShown);
   html += `<div class="card"><h2>گزارش تفصیلی ${proj ? "پروژه " + esc(proj) : "همه پروژه‌ها"} <span class="muted" style="font-weight:normal">(${rows.length} مورد)</span></h2>` +
-    (rows.length ? `<div class="tblwrap"><table class="detail"><tr>${th("detail", "id", "ردیف")}${th("detail", "project", "پروژه")}${th("detail", "work", "کار")}${th("detail", "start", "شروع")}${th("detail", "status", "وضعیت")}${th("detail", "end", "پایان")}${th("detail", "dur", "مدت (ساعت)")}${th("detail", "desc", "شرح")}${th("detail", "reply", "پاسخ")}</tr>
-    ${part.map(e => { const h = DG.dur(e); return `<tr class="click" data-eid="${e.id}"><td>${e.id}</td><td>${esc(e.project)}</td><td>${esc(e.work)}</td><td class="nw">${fmtDT(e.start)}</td><td><span class="tag ${isOpen(e) ? "open" : esc(e.status)}">${STAT(e)}</span></td><td class="nw">${fmtDT(e.end)}</td><td>${h == null ? "—" : h.toFixed(2)}</td><td class="tx">${esc(e.desc)}</td><td class="tx">${esc(e.reply)}</td></tr>`; }).join("")}</table></div>
+    (rows.length ? `<div class="tblwrap"><table class="detail"><tr><th></th>${th("detail", "id", "ردیف")}${th("detail", "project", "پروژه")}${th("detail", "work", "کار")}${th("detail", "start", "شروع")}${th("detail", "status", "وضعیت")}${th("detail", "end", "پایان")}${th("detail", "dur", "مدت (ساعت)")}${th("detail", "desc", "شرح")}${th("detail", "reply", "پاسخ")}</tr>
+    ${part.map(e => { const h = DG.dur(e); return `<tr class="click" data-eid="${e.id}"><td class="racts">${rActs(e)}</td><td>${e.id}</td><td>${esc(e.project)}</td><td>${esc(e.work)}</td><td class="nw">${fmtDT(e.start)}</td><td><span class="tag ${isOpen(e) ? "open" : esc(e.status)}">${STAT(e)}</span></td><td class="nw">${fmtDT(e.end)}</td><td>${h == null ? "—" : h.toFixed(2)}</td><td class="tx">${esc(e.desc)}</td><td class="tx">${esc(e.reply)}</td></tr>`; }).join("")}</table></div>
     ${sorted.length > reportShown ? `<div style="text-align:center;margin-top:8px"><button class="btn sec" id="reportMore">نمایش بیشتر</button></div>` : ""}<div class="hint">برای مرتب‌سازی روی عنوان ستون بزنید. با زدن روی هر ردیف می‌توانید آن را ویرایش کنید.</div>` : `<div class="empty">موردی یافت نشد.</div>`) + `</div>`;
   $("#reportBody").innerHTML = html;
-  const all = projects().map(p => { const d = reportData(p); return { p, h: d.hours, n: d.rows.length, o: d.open }; });
+  const all = [...new Set(base.map(e => e.project))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(p => { const d = reportData(base.filter(e => e.project === p)); return { p, h: d.hours, n: d.rows.length, o: d.open }; });
   const PG = { p: r => r.p, h: r => r.h, n: r => r.n, o: r => r.o };
   $("#allProjects").innerHTML = all.length ? `<div class="tblwrap"><table><tr>${th("projs", "p", "پروژه")}${th("projs", "h", "ساعت")}${th("projs", "n", "ردیف")}${th("projs", "o", "باز")}</tr>${sortRows(all, "projs", PG).map(r => `<tr class="click" data-proj="${esc(r.p)}"><td>${esc(r.p)}</td><td>${r.h.toFixed(1)}</td><td>${r.n}</td><td>${r.o || ""}</td></tr>`).join("")}</table></div>` : `<div class="empty">هنوز داده‌ای نیست.</div>`;
 }
@@ -394,7 +471,7 @@ function fillSelects() {
   const keep = (id, html) => { const el = $(id), v = el.value; el.innerHTML = html; if ([...el.options].some(o => o.value === v)) el.value = v; };
   keep("#fWork", opts);
   const all = `<option value="">همه</option>` + S.codes.map(c => `<option>${esc(c.code)}</option>`).join("");
-  keep("#qWork", all); keep("#fuWork", all);
+  keep("#qWork", all); keep("#fuWork", all); keep("#rWork", all);
   $("#projList").innerHTML = projects().map(p => `<option value="${esc(p)}">`).join("");
 }
 function renderAll() { fillSelects(); renderDaily(); renderFollow(); renderReport(); }
@@ -448,6 +525,7 @@ function saveEdit() {
 }
 
 /* ---------- خروجی / ورودی (Excel ساده) ---------- */
+/* XLSX-BEGIN */
 const enc = new TextEncoder(), dec = new TextDecoder();
 const crcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = crcT[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
@@ -478,30 +556,53 @@ const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
 function sheetXml(rows, widths, nCols) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet ${NS}><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${rows.join("")}</sheetData><autoFilter ref="A1:${String.fromCharCode(64 + nCols)}${rows.length}"/></worksheet>`;
 }
-function buildXlsx() {
+function buildXlsx(list, codes, withSummary) {
   const L = "ABCDEFGHI";
   const head = r => `<row r="1">${r.map((h, i) => cs_(L[i] + "1", h, 1)).join("")}</row>`;
-  const list = S.entries.slice().sort((a, b) => a.id - b.id);
+  list = list.slice().sort((a, b) => a.id - b.id);
+  const ids = new Set(list.map(e => e.id));
   const rows1 = [head(["ردیف", "کد پروژه", "کار", "زمان شروع", "وضعیت", "زمان پایان", "شرح", "پاسخ", "ادامه یافته در ردیف"])];
   list.forEach((e, i) => {
     const r = i + 2, sv = isoToSerial(e.start), ev = isoToSerial(e.end);
-    rows1.push(`<row r="${r}">${cn_("A" + r, e.id)}${/^[1-9]\d{0,14}$/.test(e.project) ? cn_("B" + r, e.project) : cs_("B" + r, e.project)}${cs_("C" + r, e.work)}${cn_("D" + r, sv, 2)}${cs_("E" + r, e.status)}${cn_("F" + r, ev, 2)}${cs_("G" + r, e.desc, 3)}${cs_("H" + r, e.reply, 3)}${cn_("I" + r, resumed(e) ? e.resumedBy : null)}</row>`);
+    rows1.push(`<row r="${r}">${cn_("A" + r, e.id)}${/^[1-9]\d{0,14}$/.test(e.project) ? cn_("B" + r, e.project) : cs_("B" + r, e.project)}${cs_("C" + r, e.work)}${cn_("D" + r, sv, 2)}${cs_("E" + r, e.status)}${cn_("F" + r, ev, 2)}${cs_("G" + r, e.desc, 3)}${cs_("H" + r, e.reply, 3)}${cn_("I" + r, e.resumedBy && ids.has(e.resumedBy) ? e.resumedBy : null)}</row>`);
   });
   const rows2 = [head(["کد", "شرح", "نوع محاسبه"])];
-  S.codes.forEach((c, i) => { const r = i + 2; rows2.push(`<row r="${r}">${cs_("A" + r, c.code)}${cs_("B" + r, c.desc)}${cs_("C" + r, c.type === "count" ? "تعداد" : "ساعت")}</row>`); });
+  codes.forEach((c, i) => { const r = i + 2; rows2.push(`<row r="${r}">${cs_("A" + r, c.code)}${cs_("B" + r, c.desc)}${cs_("C" + r, c.type === "count" ? "تعداد" : "ساعت")}</row>`); });
+  const rows3 = [head(["کد پروژه", "کار", "واحد", "مجموع", "تعداد ردیف", "باز"])];
+  if (withSummary) {
+    const typeOf = w => ((codes.find(c => c.code === w) || {}).type) || "hours", order = codes.map(c => c.code);
+    const rk = w => order.indexOf(w) < 0 ? 99 : order.indexOf(w), groups = new Map();
+    list.forEach(e => {
+      const k = e.project + "\u0000" + e.work; let g = groups.get(k);
+      if (!g) groups.set(k, g = { p: e.project, w: e.work, n: 0, open: 0, h: 0 });
+      g.n++; if (isOpen(e)) g.open++; else g.h += hoursBetween(e.start, e.end) || 0;
+    });
+    [...groups.values()].sort((a, b) => a.p.localeCompare(b.p, undefined, { numeric: true }) || rk(a.w) - rk(b.w)).forEach((g, i) => {
+      const r = i + 2, cnt = typeOf(g.w) === "count";
+      rows3.push(`<row r="${r}">${/^[1-9]\d{0,14}$/.test(g.p) ? cn_("A" + r, g.p) : cs_("A" + r, g.p)}${cs_("B" + r, g.w)}${cs_("C" + r, cnt ? "عدد" : "ساعت")}${cn_("D" + r, cnt ? g.n : Math.round(g.h * 100) / 100)}${cn_("E" + r, g.n)}${cn_("F" + r, g.open || null)}</row>`);
+    });
+  }
   const files = [
-    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>${withSummary ? '<Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' : ""}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
     ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
-    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook ${NS} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ثبت روزانه" sheetId="1" r:id="rId1"/><sheet name="کدهای کار" sheetId="2" r:id="rId2"/></sheets></workbook>`],
-    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook ${NS} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="ثبت روزانه" sheetId="1" r:id="rId1"/><sheet name="کدهای کار" sheetId="2" r:id="rId2"/>${withSummary ? '<sheet name="خلاصه" sheetId="3" r:id="rId4"/>' : ""}</sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${withSummary ? '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>' : ""}</Relationships>`],
     ["xl/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet ${NS}><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd\\ hh:mm:ss"/></numFmts><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
     ["xl/worksheets/sheet1.xml", sheetXml(rows1, [8, 12, 9, 20, 10, 20, 50, 50, 14], 9)],
     ["xl/worksheets/sheet2.xml", sheetXml(rows2, [12, 36, 14], 3)],
-  ].map(([name, text]) => ({ name, data: enc.encode(text) }));
+  ].concat(withSummary ? [["xl/worksheets/sheet3.xml", sheetXml(rows3, [12, 10, 8, 12, 12, 8], 6)]] : []).map(([name, text]) => ({ name, data: enc.encode(text) }));
   return zipStore(files);
 }
+/* XLSX-END */
+const stamp = (d = new Date()) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}`;
 async function exportXlsx() {
-  try { await download(`task-tracker-backup-${nowISO().slice(0, 10)}.xlsx`, buildXlsx()); toast("فایل Excel آماده شد"); }
+  try { await download(`task-tracker_${stamp()}.xlsx`, buildXlsx(S.entries, S.codes, false)); toast("فایل Excel آماده شد"); }
+  catch (e) { toast("ساخت فایل Excel انجام نشد"); }
+}
+async function exportReport() {
+  const list = reportRows();
+  if (!list.length) { toast("موردی برای خروجی نیست"); return; }
+  try { await download(`task-tracker-report_${stamp()}.xlsx`, buildXlsx(list, S.codes, true)); toast(list.length + " ردیف در Excel آماده شد"); }
   catch (e) { toast("ساخت فایل Excel انجام نشد"); }
 }
 
@@ -615,14 +716,21 @@ document.querySelectorAll("nav button").forEach(b => b.addEventListener("click",
 $("#startBtn").addEventListener("click", startEntry);
 $("#fDesc").addEventListener("keydown", e => { if (e.key === "Enter") startEntry(); });
 ["#qSearch", "#qStatus", "#qWork"].forEach(s => $(s).addEventListener("input", () => { shown = 50; renderDaily(); }));
-["#fuSearch", "#fuWork", "#fuState"].forEach(s => $(s).addEventListener("input", renderFollow));
+["#fuSearch", "#fuWork", "#fuState", "#fuSort"].forEach(s => $(s).addEventListener("input", renderFollow));
 $("#rProject").addEventListener("input", () => { reportShown = 200; $("#projDetails").open = !$("#rProject").value.trim(); renderReport(); });
 $("#rSearch").addEventListener("input", () => { reportShown = 200; renderReport(); });
+["#rFrom", "#rTo", "#rWork", "#rStatus"].forEach(s => $(s).addEventListener("input", () => { reportShown = 200; renderReport(); }));
+$("#rExport").addEventListener("click", exportReport);
+$("#rpOk").addEventListener("click", () => { if (addReply(replyFor, $("#rpText").value)) $("#rpdlg").close(); });
+$("#rpNo").addEventListener("click", () => $("#rpdlg").close());
+$("#rClear").addEventListener("click", () => { ["#rProject", "#rSearch", "#rFrom", "#rTo", "#rWork", "#rStatus"].forEach(s => { $(s).value = ""; }); $("#projDetails").open = true; reportShown = 200; renderReport(); });
 $("#moreBtn").addEventListener("click", () => { shown += 50; renderDaily(); });
 document.addEventListener("click", ev => {
   const h = ev.target.closest("th.sortable");
   if (h) { const s = SORT[h.dataset.tbl]; if (s.k === h.dataset.key) s.d = -s.d; else { s.k = h.dataset.key; s.d = 1; } renderReport(); return; }
   if (ev.target.id === "reportMore") { reportShown += 200; renderReport(); return; }
+  const rb = ev.target.closest("[data-ract]");
+  if (rb) { reportAct(rb.dataset.ract, +rb.dataset.id); return; }
   const er = ev.target.closest("tr[data-eid]");
   if (er) { openEdit(+er.dataset.eid); return; }
   const row = ev.target.closest("tr[data-proj]");
@@ -677,12 +785,118 @@ $("#installBtn").addEventListener("click", async () => { if (!deferred) return; 
 window.addEventListener("appinstalled", () => { $("#installBtn").hidden = true; });
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
 
+/* ---------- ورود و همگام‌سازی (Supabase) ---------- */
+const SB_URL = "https://kjnkkukuxjyrhlysblav.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqbmtrdWt1eGp5cmhseXNibGF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxMDA0NTUsImV4cCI6MjExMDY3NjQ1NX0.lpcqmVD-yuEe57d4knB4yspwkh2R4gCT7KlcP_Hv48g"; // کلید عمومی (anon): دیدنش خطری ندارد، امنیت با قوانین دسترسی پایگاه داده تأمین می‌شود
+const USER_DOMAIN = "task-tracker.app";
+const SESS_KEY = "tt-session";
+let session = null, syncing = false, pushTimer = null;
+const readSess = () => { try { return JSON.parse(localStorage.getItem(SESS_KEY)); } catch (e) { return null; } };
+const writeSess = s => { try { if (s) localStorage.setItem(SESS_KEY, JSON.stringify(s)); else localStorage.removeItem(SESS_KEY); } catch (e) {} };
+const setStatus = t => { $("#syncSt").textContent = t; };
+class AuthError extends Error {}
+async function authCall(grant, body) {
+  const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`, { method: "POST", headers: { apikey: SB_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new AuthError(j.error_description || j.msg || "auth"); e.status = r.status; throw e; }
+  return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600), uid: j.user && j.user.id };
+}
+async function token() {
+  if (!session) throw new AuthError("nosession");
+  if (session.expires_at - 60 > Date.now() / 1000) return session.access_token;
+  try { session = await authCall("refresh_token", { refresh_token: session.refresh_token }); writeSess(session); }
+  catch (e) { if (e instanceof AuthError && e.status >= 400 && e.status < 500) forceLogout(); throw e; }
+  return session.access_token;
+}
+async function rest(method, path, body, prefer) {
+  const call = async () => fetch(`${SB_URL}/rest/v1/${path}`, { method, headers: Object.assign({ apikey: SB_KEY, Authorization: "Bearer " + await token(), "Content-Type": "application/json" }, prefer ? { Prefer: prefer } : {}), body: body ? JSON.stringify(body) : undefined });
+  let r = await call();
+  if (r.status === 401 && session) { session.expires_at = 0; r = await call(); }
+  if (r.status === 401) { forceLogout(); throw new AuthError("401"); }
+  if (!r.ok) throw new Error("http" + r.status);
+  return r.status === 204 ? null : r.json();
+}
+const freshState = () => ({ entries: [], codes: DEFAULT_CODES.map(c => ({ ...c })), nextId: 1, jalali: false });
+async function adopt(remote) {
+  clearTimeout(saveTimer);
+  S = Object.assign(freshState(), remote.data);
+  META = { dirty: false, rev: remote.updated_at, synced: true };
+  localVer++;
+  await dbSet("state", S); await dbSet("meta", META);
+  $("#jalali").checked = !!S.jalali; renderAll(); renderCodes();
+}
+async function pushData() {
+  const ver = localVer, snap = JSON.parse(JSON.stringify(S));
+  const out = META.rev
+    ? await rest("PATCH", `app_state?user_id=eq.${session.uid}&updated_at=eq.${encodeURIComponent(META.rev)}`, { data: snap }, "return=representation")
+    : await rest("POST", "app_state?on_conflict=user_id", [{ user_id: session.uid, data: snap }], "resolution=merge-duplicates,return=representation");
+  if (!out || !out.length) return false; // نسخه‌ی سرور در این فاصله تغییر کرده است
+  META.rev = out[0].updated_at; META.synced = true; if (ver === localVer) META.dirty = false;
+  await dbSet("meta", META); return true;
+}
+async function syncCore() {
+  for (let i = 0; i < 3; i++) {
+    const remote = (await rest("GET", `app_state?select=data,updated_at&user_id=eq.${session.uid}`))[0];
+    if (!remote) { META.rev = null; if (await pushData()) return; continue; }
+    const changed = remote.updated_at !== META.rev;
+    if (!META.synced || (changed && META.dirty)) {
+      if (!S.entries.length && !META.dirty) { await adopt(remote); return; }
+      const keepLocal = await ask(META.synced
+        ? "هم روی این دستگاه و هم روی سرور تغییرات تازه‌ای هست. کدام نسخه نگه داشته شود؟ (با انتخاب «نسخه‌ی این دستگاه»، داده‌ی سرور جایگزین می‌شود.)"
+        : "روی این دستگاه داده‌ای هست و روی سرور هم داده وجود دارد. کدام نسخه نگه داشته شود؟ (با انتخاب «نسخه‌ی این دستگاه»، داده‌ی سرور جایگزین می‌شود.)", "نسخه‌ی این دستگاه");
+      if (!keepLocal) { try { await dbSet("localBackup", { at: nowISO(), state: S }); } catch (e) {} await adopt(remote); return; }
+      META.rev = remote.updated_at; META.synced = true; META.dirty = true; localVer++;
+    } else if (changed) { await adopt(remote); return; }
+    if (!META.dirty) return;
+    if (await pushData()) return;
+  }
+}
+async function syncNow(manual) {
+  if (!session || syncing || $("#dlg").open || $("#rpdlg").open) return;
+  syncing = true; setStatus("↻ همگام‌سازی…");
+  try { await syncCore(); setStatus(META.dirty ? "● ذخیره نشده" : "✓ همگام"); if (manual) toast("همگام‌سازی انجام شد ✓"); }
+  catch (e) {
+    if (!session) setStatus("");
+    else { setStatus(navigator.onLine ? "⚠ خطای ارتباط" : "آفلاین"); if (manual) toast(navigator.onLine ? "ارتباط با سرور برقرار نشد" : "اینترنت قطع است"); }
+  }
+  finally { syncing = false; }
+}
+function schedulePush() { clearTimeout(pushTimer); if (!session) return; setStatus("● ذخیره نشده"); pushTimer = setTimeout(() => syncNow(), 1200); }
+function lock() { document.body.classList.add("locked"); $("#lgPass").value = ""; $("#lgErr").textContent = ""; setStatus(""); }
+function unlock() { document.body.classList.remove("locked"); renderAll(); renderCodes(); syncNow(); }
+function forceLogout() { session = null; writeSess(null); lock(); }
+async function doLogin() {
+  const u = $("#lgUser").value.trim(), p = $("#lgPass").value; if (!u || !p) return;
+  const email = u.includes("@") ? u : `${u.toLowerCase()}@${USER_DOMAIN}`;
+  $("#lgBtn").disabled = true; $("#lgErr").textContent = "";
+  try { session = await authCall("password", { email, password: p }); writeSess(session); $("#lgPass").value = ""; unlock(); }
+  catch (e) { $("#lgErr").textContent = e instanceof AuthError ? (e.status === 400 ? "نام کاربری یا رمز عبور اشتباه است." : "ورود انجام نشد (کد " + e.status + ").") : "اتصال به سرور برقرار نشد. اینترنت یا VPN را بررسی کنید."; }
+  $("#lgBtn").disabled = false;
+}
+$("#lgForm").addEventListener("submit", ev => { ev.preventDefault(); doLogin(); });
+$("#syncBtn").addEventListener("click", () => syncNow(true));
+$("#logoutBtn").addEventListener("click", async () => {
+  if (META.dirty) await syncNow();
+  if (!(await ask(META.dirty ? "تغییرات همگام‌نشده‌ی این دستگاه از بین می‌رود. خارج می‌شوید؟" : "از حساب خارج می‌شوید و داده‌های این دستگاه پاک می‌شود (داده‌ی سرور می‌ماند).", "خروج"))) return;
+  clearTimeout(saveTimer); clearTimeout(pushTimer);
+  session = null; writeSess(null);
+  S = freshState(); META = { dirty: false, rev: null, synced: false }; localVer++;
+  try { await dbSet("state", null); await dbSet("meta", null); await dbSet("localBackup", null); } catch (e) {}
+  $("#jalali").checked = false; renderAll(); renderCodes(); lock();
+});
+window.addEventListener("online", () => syncNow());
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncNow(); });
+setInterval(() => { if (!document.hidden) syncNow(); }, 20000);
+
 /* ---------- شروع ---------- */
 (async function init() {
-  let had = false;
-  try { const s = await dbGet("state"); if (s && s.entries) { S = Object.assign(S, s); had = true; } } catch (e) { toast("خواندن داده‌ها ممکن نشد"); }
+  try {
+    const s = await dbGet("state"); if (s && s.entries) S = Object.assign(S, s);
+    const m = await dbGet("meta"); if (m) META = Object.assign(META, m);
+  } catch (e) { toast("خواندن داده‌ها ممکن نشد"); }
   $("#jalali").checked = !!S.jalali;
-  renderAll(); renderCodes();
+  session = readSess();
+  if (session && session.uid) unlock(); else { session = null; lock(); }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(ok => { $("#storageInfo").textContent = ok ? "ذخیره‌سازی دائمی مرورگر فعال است." : "برای اطمینان، پشتیبان بگیرید؛ مرورگر ممکن است داده‌های سایت را در شرایط کمبود فضا پاک کند."; }).catch(() => {});
   setInterval(() => { if (!$("#dlg").open && !$("#cdlg").open) { renderDaily(); renderFollow(); } }, 60000);
 })();
