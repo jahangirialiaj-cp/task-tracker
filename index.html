@@ -836,7 +836,9 @@ async function pushData() {
 }
 async function syncCore() {
   for (let i = 0; i < 3; i++) {
-    const remote = (await rest("GET", `app_state?select=data,updated_at&user_id=eq.${session.uid}`))[0];
+    const head = (await rest("GET", `app_state?select=updated_at&user_id=eq.${session.uid}`))[0]; // فقط زمان آخرین تغییر (چند بایت)
+    if (head && META.synced && head.updated_at === META.rev) { if (!META.dirty) return; if (await pushData()) return; continue; } // چیزی در سرور عوض نشده: دانلود لازم نیست
+    const remote = head ? (await rest("GET", `app_state?select=data,updated_at&user_id=eq.${session.uid}`))[0] : null;
     if (!remote) { META.rev = null; if (await pushData()) return; continue; }
     const changed = remote.updated_at !== META.rev;
     if (!META.synced || (changed && META.dirty)) {
